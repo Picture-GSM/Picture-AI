@@ -63,6 +63,26 @@ class Normalization(object):
         return data
 
 
+class CenterCrop(object):
+    def __init__(self, shape):
+        self.shape = shape
+
+    def __call__(self, data):
+        h, w = data['label'].shape[:2]
+        new_h, new_w = self.shape
+
+        top = (h - new_h) // 2
+        left = (w - new_w) // 2
+
+        id_y = np.arange(top, top + new_h, 1)[:, np.newaxis]
+        id_x = np.arange(left, left + new_w, 1)
+
+        for key, value in data.items():
+            data[key] = value[id_y, id_x]
+
+        return data
+
+
 class RandomCrop(object):
     def __init__(self, shape):
         self.shape = shape

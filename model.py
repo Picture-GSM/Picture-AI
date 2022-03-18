@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 
 import torchvision.models as models
+from utils import calc_mean_std
 
 
 class Encoder(nn.Module):
@@ -60,3 +61,13 @@ class UpBlock(nn.Module):
 
     def forward(self, x):
         return self.block(x)
+
+
+def AdaIN(content, style):
+    size = content.size()
+    style_mean, style_std = calc_mean_std(style)
+    content_mean, content_std = calc_mean_std(content)
+
+    normalized = (content - content_mean.expand(size)) / content_std.expand(size)
+
+    return normalized * style_std.expand(size) + style_mean.expand(size)

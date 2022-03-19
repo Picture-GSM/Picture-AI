@@ -8,38 +8,29 @@ from skimage.transform import resize
 
 
 class Dataset(Dataset):
-    def __init__(self, path, transformS=None, transformC=None):
+    def __init__(self, path, transform=None):
         super(Dataset, self).__init__()
         self.path = path
-        self.style_files = [x for x in os.listdir(os.path.join(path, 'style'))]
-        self.content_files = [x for x in os.listdir(os.path.join(path, 'content'))]
-        self.transformS = transformS
-        self.transformC = transformC
+        if transform:
+            self.files = [x for x in os.listdir(os.path.join(path, 'style'))]
+        else:
+            self.files = [x for x in os.listdir(os.path.join(path, 'content'))]
+        self.transform = transform
         self.totensor = ToTensor()
 
-        print(self.style_files)
-
     def __len__(self):
-        return min(len(self.style_files), len(self.content_files))
+        return len(self.files)
 
     def __getitem__(self, index):
-        style_img = plt.imread(os.path.join(self.path + '/style', self.style_files[index]))
-        content_img = plt.imread(os.path.join(self.path + '/content', self.content_files[index]))
+        if self.transform:
+            img = plt.imread(os.path.join(self.path + '/style', self.files[index]))
+            img = self.transform(img)
+        else:
+            img = plt.imread(os.path.join(self.path + '/content', self.files[index]))
 
-        '''if (style_img.dtype == np.uint8) and (content_img.dtype == np.uint8):
-            style_img /= 255.0
-            content_img /= 255.0'''
+        img = self.totensor(img)
 
-        if self.transformS:
-            style_img = self.transform(style_img)
-        if self.transformC:
-            content_img = self.transformC(content_img)
-
-        style_img = ToTensor()(style_img)
-        content_img = ToTensor()(content_img)
-
-        data = {'style': style_img, 'content': content_img}
-        return data
+        return img
 
 
 class ToTensor(object):

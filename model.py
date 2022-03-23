@@ -8,18 +8,35 @@ from utils import calc_mean_std
 class Encoder(nn.Module):
     def __init__(self):
         super(Encoder, self).__init__()
-
+        print('encoder')
         self.model = models.vgg19(pretrained=True).features[:21]
+        self.enc_1 = nn.Sequential(*self.model[:4])
+        self.enc_2 = nn.Sequential(*self.model[4:11])
+        self.enc_3 = nn.Sequential(*self.model[11:18])
+        self.enc_4 = nn.Sequential(*self.model[18:31])
 
-    def forward(self, x):
-        for layer_num, layer in enumerate(self.model):
-            x = layer(x)
+    def extract_input_image(self, input):
+        results = [input]
+        for i in range(1, 5):
+            func = getattr(self, 'enc_{:d}'.format(i))
+            results.append(func(results[-1]))
+        return results[1:]
 
-        return x
+    def encoder(self, input):
+        for i in range(4):
+            input = getattr(self, 'enc_{:d}'.format(i + 1))(input)
+        return input
+
+    def forward(self, content, style, alpha=1.0):
+        style_feats = self.extract_input_image(style)
+        content_feats = self.encoder(content)
+        t = AdaIN(content_feats, style_feats[-1])
+        t = alpha * t + (1 - alpha) * content_feats
+        return style_feats, t
 
 
 class Decoder(nn.Module):
-    def __init__(self):
+    def __init__(self, encoder):
         super(Decoder, self).__init__()
         self.upsample = nn.Upsample(scale_factor=2)
         self.up1 = UpBlock(512, 256)
@@ -31,6 +48,7 @@ class Decoder(nn.Module):
         self.up7 = UpBlock(128, 64)
         self.up8 = UpBlock(64, 64)
         self.up9 = UpBlock(64, 3, False)
+        self.encoder = encoder
 
     def forward(self, x):
         x = self.up1(x)
@@ -44,9 +62,11 @@ class Decoder(nn.Module):
         x = self.up7(x)
         x = self.upsample(x)
         x = self.up8(x)
-        x = self.up9(x)
+        save = self.up9(x)
 
-        return x
+        x = self.encoder.extract_input_image(save)
+
+        return x, save
 
 
 class UpBlock(nn.Module):
@@ -71,3 +91,6 @@ def AdaIN(content, style):
     normalized = (content - content_mean.expand(size)) / content_std.expand(size)
 
     return normalized * style_std.expand(size) + style_mean.expand(size)
+
+
+

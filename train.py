@@ -74,27 +74,29 @@ if not os.path.exists(model_path):
 if os.listdir(model_path):
     decoder.load_state_dict(torch.load('models/decoder.pth'))
 
+decoder.train()
+
 for i in tqdm(range(max_iter)):
     adjust_learning_rate(optimizer, iteration_count=i)
     content_images = next(content_iter).to(device)
     style_images = next(style_iter).to(device)
 
     style_feats, t = encoder(content_images, style_images)
-    g_t_feats = decoder(t)
+    g_t_feats, save = decoder(t)
 
     loss_c = loss_fn(g_t_feats[-1], t)
     input_mean, input_std = calc_mean_std(g_t_feats[0])
     target_mean, target_std = calc_mean_std(style_feats[0])
     loss_s = loss_fn(input_mean, target_mean) + loss_fn(input_std, target_std)
-    for i in range(1, 4):
-        input_mean, input_std = calc_mean_std(g_t_feats[i])
-        target_mean, target_std = calc_mean_std(style_feats[i])
+    for j in range(1, 4):
+        input_mean, input_std = calc_mean_std(g_t_feats[j])
+        target_mean, target_std = calc_mean_std(style_feats[j])
         loss_s += loss_fn(input_mean, target_mean) + loss_fn(input_std, target_std)
 
     loss = loss_c + loss_s
 
     if i % 5000 == 0:
-        plt.imshow(g_t_feats)
+        plt.imshow(save[0].permute(1, 2, 0).detach().numpy())
         plt.show()
 
     optimizer.zero_grad()

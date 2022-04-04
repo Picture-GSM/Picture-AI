@@ -9,9 +9,11 @@ import torch.optim as optim
 from torch.utils.data import DataLoader
 from torchvision.transforms import Compose, ToTensor, Resize, RandomCrop
 from tqdm import tqdm
+# 코랩에서 쓸 경우는
+# from torch.utils.tensorboard import SummaryWriter
 from tensorboardX import SummaryWriter
 
-from model import Encoder, Decoder
+from model import Encoder, Decoder, Model
 from data_loader import Dataset
 from sampler import InfiniteSamplerWrapper
 from utils import calc_mean_std
@@ -60,8 +62,9 @@ out_path = './training_results'
 if not os.path.exists(out_path):
     os.makedirs(out_path)
 
-encoder = Encoder().to(device)
-decoder = Decoder(encoder=encoder).to(device)
+model = Model()
+encoder = model.encoder.to(device)
+decoder = model.decoder.to(device).train()
 
 optimizer = torch.optim.Adam(decoder.parameters(), lr=opt.lr)
 
@@ -72,7 +75,7 @@ if not os.path.exists(model_path):
     os.makedirs(model_path)
 
 if os.listdir(model_path):
-    decoder.load_state_dict(torch.load('models/decoder.pth'))
+    decoder.load_state_dict(torch.load('models/decoder_2.pth', map_location=device))
 
 decoder.train()
 
@@ -81,8 +84,7 @@ for i in tqdm(range(max_iter)):
     content_images = next(content_iter).to(device)
     style_images = next(style_iter).to(device)
 
-    style_feats, t = encoder(content_images, style_images)
-    g_t_feats, save = decoder(t)
+    g_t_feats, t, style_feats = model(content_images, style_images)
 
     loss_c = loss_fn(g_t_feats[-1], t)
     input_mean, input_std = calc_mean_std(g_t_feats[0])
@@ -94,10 +96,6 @@ for i in tqdm(range(max_iter)):
         loss_s += loss_fn(input_mean, target_mean) + loss_fn(input_std, target_std)
 
     loss = loss_c + loss_s
-
-    if i % 5000 == 0:
-        plt.imshow(save[0].permute(1, 2, 0).detach().numpy())
-        plt.show()
 
     optimizer.zero_grad()
     loss.backward()

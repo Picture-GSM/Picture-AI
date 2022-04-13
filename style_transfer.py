@@ -13,7 +13,7 @@ from model import Encoder, Decoder, AdaIN
 
 def style_transfer(encoder, decoder, content, style, alpha=1.0):
     content_f = encoder(content)
-    style_f = decoder(style)
+    style_f = encoder(style)
     feat = AdaIN(content_f, style_f)
     feat = feat * alpha + content_f * (1 - alpha)
     return decoder(feat)
@@ -30,8 +30,8 @@ def transformer(size):
 parser = argparse.ArgumentParser()
 parser.add_argument('--content_dir', type=str, default='./input/content')
 parser.add_argument('--style_dir', type=str, default='./input/style')
-parser.add_argument('--decoder', type=str, default='./models/decoder_2.pth')
-parser.add_argument('--alpha', type=float, default=1.0,
+parser.add_argument('--decoder', type=str, default='./models/decoder_3.pth')
+parser.add_argument('--alpha', type=float, default=0.6,
                     help='0에 가까울 수록 스타일 이미지가 많이 적용 됩니다.')
 parser.add_argument('--preserve_color', type=bool, default=False)
 
@@ -54,7 +54,7 @@ if args.style_dir:
     style_paths = [f for f in Path(args.style_dir).glob('*')]
 
 encoder = Encoder()
-decoder = Decoder(encoder)
+decoder = Decoder()
 
 decoder.load_state_dict(torch.load(args.decoder, map_location=device))
 
@@ -66,8 +66,8 @@ s_transform = transformer(args.style_size)
 
 for content_path in content_paths:
     for style_path in style_paths:
-        content = c_transform(Image.open(str(content_path)))
-        style = s_transform(Image.open(str(style_path)))
+        content = c_transform(Image.open(str(content_path)).convert('RGB'))
+        style = s_transform(Image.open(str(style_path)).convert('RGB'))
         if args.preserve_color:
             style = coral(style, content)
         style = style.to(device).unsqueeze(0)
@@ -76,7 +76,7 @@ for content_path in content_paths:
             output = style_transfer(encoder, decoder, content, style, args.alpha)
         output = output.cpu()
 
-        output_name = output_dir / '{:s}_stylized_{:s}.png'.format(
+        output_name = output_dir / '{:s}_stylized_{:s}_3_06.png'.format(
             content_path.stem, style_path.stem
         )
         save_image(output, str(output_name))

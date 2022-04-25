@@ -1,21 +1,9 @@
-import coremltools as ct
-import urllib
 import torch
 import torch.nn as nn
-import torchvision
-from PIL import Image
-from torchvision import transforms
+from torch.utils.mobile_optimizer import optimize_for_mobile
+
 
 from model import Model, AdaIN
-
-
-to_tensor = transforms.ToTensor()
-
-input_image_content = Image.open('./input/content/modern.png').convert('RGB')
-input_image_style = Image.open('./input/style/style2.png').convert('RGB')
-
-input_tensor_content = to_tensor(input_image_content).unsqueeze(0)
-input_tensor_style = to_tensor(input_image_style).unsqueeze(0)
 
 
 class ConvertModel(nn.Module):
@@ -33,15 +21,13 @@ class ConvertModel(nn.Module):
         return self.model.decoder(feat)
 
 
-model = ConvertModel().eval()
+model = ConvertModel()
 
-trace = torch.jit.trace(model, (input_tensor_content, input_tensor_style))
+dummy_input = torch.rand(1, 3, 512, 512)
 
-# bias=[-0.485/0.229, -0.456/0.224, -0.406/0.225], scale=1./(0.226*255.0)
-input_1 = ct.ImageType(name='input_1', shape=input_tensor_content.shape)
-input_2 = ct.ImageType(name='input_2', shape=input_tensor_style.shape)
+traced_model = torch.jit.trace(model, (dummy_input, dummy_input))
+optimized_model = optimize_for_mobile(traced_model)
 
-model = ct.convert(trace, inputs=[input_1, input_2])
+optimized_model.save('style_transfer.pt')
 
-model.type = 'styleTransfer'
-model.save('styleTransfer.mlmodel')
+model_load = torch.jit.load('style_transfer.pt')
